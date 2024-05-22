@@ -1,173 +1,173 @@
 import pyodbc # Connects to a SQL database using pyodbc
 import uuid
 # Connect to the database.
-def conectar_banco():
-  print("---- Connecting to the Library Server ----")
-  # Please obtain the credentials for the database.
-  connection_data = (
-    "Driver = {SQL Server};"
-    "Server = HostName/IP;"
-    "Database = your DataBase;"
-  )
-  try:
-    connection = pyodbc.connect(connection_data)
-    print("\n---- Successful connection ----")
-    return connection.cursor()
-  except pyodbc.Error as e:
-    print("There was an error in connecting to the database:", e)
-    return None
-# Etapa 1 - Lists all the books in the library.
-def listar_livros(cursor):
-    print("A list of books from the library.")
+def connect_to_database():
+    print("---- Connecting to the Library Server ----")
+    # Please obtain the credentials for the database.
+    connection_data = (
+        "Driver = {SQL Server};"
+        "Server = HostName/IP;"
+        "Database = your DataBase;"
+    )
     try:
-        cursor.execute("SELECT titulo, autor FROM biblioteca")
-        books = cursor.fetchall()
-        for ordem, book in enumerate(books, start=1):
-            print(ordem, "-", "\n--- Titulo:", book[0], "\n--- Autor:", book[1])
+        connection = pyodbc.connect(connection_data)
+        print("\n---- Connection Successful ----")
+        return connection.cursor()
     except pyodbc.Error as e:
-        print("Book listing error:", e)
-# Etapa 2 - Check if the library has the book.
-def verificar_disponibilidade(cursor):
-    title = input("Enter the book title: ").lower()
+        print("Error connecting to the database:", e)
+        return None
+# Step 1 - List all books in the library.
+def list_books(cursor):
+    print("List of books in the Library")
     try:
-        cursor.execute("SELECT titulo, disponibilidade FROM biblioteca WHERE LOWER(titulo) = ?", (title,))
+        cursor.execute("SELECT title, author FROM library")
+        books = cursor.fetchall()
+        for index, book in enumerate(books, start=1):
+            print(index, "-", "\n--- Title:", book[0], "\n--- Author:", book[1])
+    except pyodbc.Error as e:
+        print("Error listing books:", e)
+# Step 2 - Check the availability of a book in the library.
+def check_availability(cursor):
+    title = input("Enter the Book Title: ").lower()
+    try:
+        cursor.execute("SELECT title, availability FROM library WHERE LOWER(title) = ?", (title,))
         book = cursor.fetchone()
         if book:
-            if book[1].lower() == "sim":
+            if book[1].lower() == "yes":
                 print(f"\nThe book '{book[0]}' is available.")
             else:
-                print(f"\nThe book '{book[0]}' is not available.")
+                print(f"\nThe book '{book[0]}' is not available at the moment.")
         else:
-            print(f"\nBook '{title}' is not registered in the library.")
+            print(f"\nThe book '{title}' is not registered in the library.")
     except pyodbc.Error as e:
-        print("Checking availability:", e)
-# Etapa 3 - Allows student to reserve book.
-def reservar_livro(cursor):
-    name = input("Enter the student's name: ").lower()
+        print("Error checking availability:", e)
+# Step 3 - Allow a student to reserve a book.
+def reserve_book(cursor):
+    name = input("Enter the student's full name: ").lower()
     try:
-        cursor.execute("SELECT id, nome FROM usuarios WHERE LOWER(nome) = ?", (name,))
-        aluno = cursor.fetchone()
-        if aluno:
-            aluno_id = aluno[0]
+        cursor.execute("SELECT id, name FROM users WHERE LOWER(name) = ?", (name,))
+        student = cursor.fetchone()
+        if student:
+            student_id = student[0]
         else:
-            aluno_id = str(uuid.uuid4())
-            cursor.execute("INSERT INTO usuarios (id, nome) VALUES (?, ?)", (aluno_id, name))
+            student_id = str(uuid.uuid4())
+            cursor.execute("INSERT INTO users (id, name) VALUES (?, ?)", (student_id, name))
             cursor.connection.commit()
-            print(f"\nO Aluno {name} foi cadastrado com sucesso.")
+            print(f"\nThe student {name} has been successfully registered.")
     except pyodbc.Error as e:
-        print("Erro ao cadastrar usuário:", e)
+        print("Error registering user:", e)
         return
 
-    titulo_livro = input("\nDigite o Título do Livro que deseja reservar: ").lower()
+    book_title = input("\nEnter the Title of the Book you want to reserve: ").lower()
     try:
-        cursor.execute("SELECT titulo, disponibilidade FROM biblioteca WHERE LOWER(titulo) = ?", (titulo_livro,))
-        livro = cursor.fetchone()
-        if livro:
-            if livro[1].lower() == "sim":
-                cursor.execute("UPDATE biblioteca SET disponibilidade = 'não' WHERE LOWER(titulo) = ?", (titulo_livro,))
+        cursor.execute("SELECT title, availability FROM library WHERE LOWER(title) = ?", (book_title,))
+        book = cursor.fetchone()
+        if book:
+            if book[1].lower() == "yes":
+                cursor.execute("UPDATE library SET availability = 'no' WHERE LOWER(title) = ?", (book_title,))
                 cursor.connection.commit()
-                cursor.execute("INSERT INTO reservas (id, livro) VALUES (?, ?)", (aluno_id, livro[0]))
+                cursor.execute("INSERT INTO reservations (id, book) VALUES (?, ?)", (student_id, book[0]))
                 cursor.connection.commit()
-                print(f"\nO livro '{titulo_livro}' foi reservado com sucesso.")
+                print(f"\nThe book '{book_title}' has been successfully reserved.")
             else:
-                print(f"\nO livro '{livro[0]}' não está disponível para reserva no momento.")
+                print(f"\nThe book '{book[0]}' is not available for reservation at the moment.")
         else:
-            print(f"\nO Livro '{titulo_livro}' não está cadastrado na biblioteca.")
+            print(f"\nThe book '{book_title}' is not registered in the library.")
     except pyodbc.Error as e:
-        print("Erro ao reservar livro:", e)
-# Etapa 4 - Permite o aluno devolver um livro reservado.
-def devolucao_livro(cursor):
-    nome = input("Insira o nome completo do Aluno: ").lower()
+        print("Error reserving book:", e)
+# Step 4 - Allow a student to return a reserved book.
+def return_book(cursor):
+    name = input("Enter the student's full name: ").lower()
     try:
-        cursor.execute("SELECT id, nome FROM usuarios WHERE LOWER(nome) = ?", (nome,))
-        aluno = cursor.fetchone()
-        if aluno:
-            aluno_id = aluno[0]
-            titulo_livro = input("\nDigite o Título do Livro que deseja devolver: ").lower()
+        cursor.execute("SELECT id, name FROM users WHERE LOWER(name) = ?", (name,))
+        student = cursor.fetchone()
+        if student:
+            student_id = student[0]
+            book_title = input("\nEnter the Title of the Book you want to return: ").lower()
             try:
-                cursor.execute("SELECT id, livro FROM reservas WHERE id = ? AND LOWER(livro) = ?", (aluno_id, titulo_livro))
-                livro = cursor.fetchone()
-                if livro:
-                    cursor.execute("UPDATE biblioteca SET disponibilidade = 'sim' WHERE LOWER(titulo) = ?", (titulo_livro,))
+                cursor.execute("SELECT id, book FROM reservations WHERE id = ? AND LOWER(book) = ?", (student_id, book_title))
+                book = cursor.fetchone()
+                if book:
+                    cursor.execute("UPDATE library SET availability = 'yes' WHERE LOWER(title) = ?", (book_title,))
                     cursor.connection.commit()
-                    cursor.execute("DELETE FROM reservas WHERE id = ? AND LOWER(livro) = ?", (aluno_id, titulo_livro))
+                    cursor.execute("DELETE FROM reservations WHERE id = ? AND LOWER(book) = ?", (student_id, book_title))
                     cursor.connection.commit()
-                    print(f"\nO livro '{livro[1]}' foi devolvido com sucesso para a biblioteca.")
+                    print(f"\nThe book '{book[1]}' has been successfully returned to the library.")
                 else:
-                    print(f"\nO livro '{titulo_livro}' não está reservado pelo aluno {nome}.")
+                    print(f"\nThe book '{book_title}' is not reserved by the student {name}.")
             except pyodbc.Error as e:
-                print("Erro ao devolver livro:", e)
+                print("Error returning book:", e)
         else:
-            print(f"\nO Aluno {nome} não possui cadastro no sistema.")
+            print(f"\nThe student {name} is not registered in the system.")
     except pyodbc.Error as e:
-        print("Erro ao fazer consulta:", e)
-# Etapa 5 - Adiciona um novo livro à biblioteca.
-def adicionar_livro(cursor):
-    titulo = input("Digite o Título do Livro: ").lower()
-    autor = input("Digite o nome do Autor do Livro: ").lower()
+        print("Error querying database:", e)
+# Step 5 - Add a new book to the library.
+def add_book(cursor):
+    title = input("Enter the Book Title: ").lower()
+    author = input("Enter the Author's Name: ").lower()
     while True:
-        disponibilidade = input("O Livro está disponível? (Sim/Não): ").lower()
-        if disponibilidade in ["sim", "não"]:
+        availability = input("Is the Book available? (Yes/No): ").lower()
+        if availability in ["yes", "no"]:
             break
         else:
-            print("Por favor, insira 'Sim' ou 'Não'.")
-    data = input("Digite a data de hoje (DD/MM/AAAA): ")
+            print("Please enter 'Yes' or 'No'.")
+    date = input("Enter today's date (DD/MM/YYYY): ")
     try:
         cursor.execute(
-            "INSERT INTO biblioteca (titulo, autor, disponibilidade, data_add) VALUES (?, ?, ?, ?)",
-            (titulo, autor, disponibilidade, data)
+            "INSERT INTO library (title, author, availability, date_add) VALUES (?, ?, ?, ?)",
+            (title, author, availability, date)
         )
         cursor.connection.commit()
-        print(f"\nO Livro '{titulo}' foi adicionado com sucesso!")
+        print(f"\nThe Book '{title}' has been successfully added!")
     except pyodbc.Error as e:
-        print("Erro ao adicionar livro:", e)
-# Etapa 6 - Remove um livro da biblioteca.
-def remover_livro(cursor):
-    titulo = input("Digite o Título do livro a ser removido: ").lower()
+        print("Error adding book:", e)
+# Step 6 - Remove a book from the library.
+def remove_book(cursor):
+    title = input("Enter the Title of the book to be removed: ").lower()
     try:
-        cursor.execute("SELECT titulo FROM biblioteca WHERE LOWER(titulo) = ?", (titulo,))
-        livro = cursor.fetchone()
-        if livro:
-            cursor.execute("DELETE FROM biblioteca WHERE LOWER(titulo) = ?", (titulo,))
+        cursor.execute("SELECT title FROM library WHERE LOWER(title) = ?", (title,))
+        book = cursor.fetchone()
+        if book:
+            cursor.execute("DELETE FROM library WHERE LOWER(title) = ?", (title,))
             cursor.connection.commit()
-            print(f"\nO livro '{livro[0]}' foi removido da biblioteca com sucesso.")
+            print(f"\nThe book '{book[0]}' has been successfully removed from the library.")
         else:
-            print(f"\nO livro '{titulo}' não está cadastrado na biblioteca.")
+            print(f"\nThe book '{title}' is not registered in the library.")
     except pyodbc.Error as e:
-        print("Erro ao remover livro:", e)
-# Etapa 0 - Exibe o menu e gerencia as opções do usuário.
+        print("Error removing book:", e)
+# Step 0 - Display the menu and manage user options.
 def menu():
-    cursor = conectar_banco()
+    cursor = connect_to_database()
     if not cursor:
         return
     while True:
         print("\nMenu: ")
-        print("1. Listar Livros")
-        print("2. Verificar Disponibilidades")
-        print("3. Reservar Livro")
-        print("4. Devolver Livro")
-        print("5. Adicionar Livro")
-        print("6. Remover Livro")
-        print("0. Sair")
-        opcao = input("Digite o número da opção desejada: ")
-        if opcao == '1':
-            listar_livros(cursor)
-        elif opcao == '2':
-            verificar_disponibilidade(cursor)
-        elif opcao == '3':
-            reservar_livro(cursor)
-        elif opcao == '4':
-            devolucao_livro(cursor)
-        elif opcao == '5':
-            adicionar_livro(cursor)
-        elif opcao == '6':
-            remover_livro(cursor)
-        elif opcao == '0':
-            print("Saindo do Programa...")
+        print("1. List Books")
+        print("2. Check Availability")
+        print("3. Reserve Book")
+        print("4. Return Book")
+        print("5. Add Book")
+        print("6. Remove Book")
+        print("0. Exit")
+        option = input("Enter the number of the desired option: ")
+        if option == '1':
+            list_books(cursor)
+        elif option == '2':
+            check_availability(cursor)
+        elif option == '3':
+            reserve_book(cursor)
+        elif option == '4':
+            return_book(cursor)
+        elif option == '5':
+            add_book(cursor)
+        elif option == '6':
+            remove_book(cursor)
+        elif option == '0':
+            print("Exiting the Program...")
             break
         else:
-            print("\nOpção inválida. Tente novamente, escolha uma opção válida.")
-# Inicia o programa
+            print("\nInvalid option. Please try again and choose a valid option.")
+# Start the program
 menu()
 
 #References:
